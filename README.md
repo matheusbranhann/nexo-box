@@ -1,9 +1,10 @@
 # Nexo Box
 
-A one-click system that runs a real **Windows desktop inside a container** ([dockur/windows](https://github.com/dockur/windows))
-to sign in to Steam and play **TBH: Task Bar Hero**, with **full access for any AI agent**
+A one-click system that runs a real, disposable **Windows desktop inside a container**
+([dockur/windows](https://github.com/dockur/windows)), **fully controllable by any AI agent**
 via [Windows-MCP](https://github.com/CursorTouch/Windows-MCP) (screenshot + mouse/keyboard + PowerShell)
-and through a noVNC/RDP screen.
+and through a noVNC/RDP screen. It ships with **NexoGate**, a local web dashboard to create, clone,
+monitor, and delete boxes.
 
 ## Installation (any PC)
 
@@ -11,15 +12,12 @@ and through a noVNC/RDP screen.
 2. Double-click **`install.bat`** and accept the administrator prompt.
 3. If it asks to restart, accept — **after the reboot it reopens on its own and continues**.
 4. At the end it opens `http://localhost:8006`: the box's Windows installs itself (20-40 min, hands-off).
-5. When the desktop appears, the box installs Steam and the AI server automatically. Then you just:
-   - open **Steam** and sign in to **your account** (regular Steam Guard, only the first time — the login is saved);
-   - click the **"Install TBH"** shortcut on the box's desktop.
+5. When the desktop appears, the box provisions itself automatically: it installs the Windows-MCP
+   server (AI access) and whatever else `oem/setup.ps1` defines. From there, connect an AI agent, use
+   the box through the browser screen, and install any software you need inside it.
 
 **Host requirements**: Windows 11, virtualization enabled in the BIOS (Intel VT-x / AMD SVM),
 16 GB of RAM recommended, ~30 GB of free disk space, an internet connection.
-
-> The game **requires an internet connection** even though it is single-player: chest drops are
-> validated server-side. The box ships with networking enabled.
 
 ## Day-to-day
 
@@ -30,6 +28,7 @@ and through a noVNC/RDP screen.
 | `status.bat` | Shows state, addresses, and the MCP key |
 | `connect-claude.bat` | Connects Claude Code to the box (one click) |
 | `slim.bat` | Slims down an already-installed box (thin disk + lower RAM/CPU) without reinstalling |
+| `nexo.bat` | Opens the NexoGate dashboard (create/clone/monitor/delete boxes) |
 
 ## Access (this PC only, by default)
 
@@ -46,36 +45,41 @@ The MCP authentication key is stored in `.env` (`MCP_AUTH_KEY`); `status.bat` pr
 > **MCP Screenshot stops working** until you log in again through noVNC (or restart the box).
 > Prefer noVNC for day-to-day use.
 
+## NexoGate — managing many boxes
+
+Run `nexo.bat` to open a local dashboard that turns the installed box into a **base/template** and
+lets you spin up more from it. Each new box is a copy of the base disk with its own ports and its own
+AI key. See [`nexo/README.md`](nexo/README.md) for details. You can:
+
+- **Create / clone** a box from the base (or from another box), with the RAM/cores you choose.
+- **Start / stop / restart / delete** boxes.
+- **Monitor usage** live (CPU + RAM from `docker stats`, real disk size from the thin qcow2).
+- **Open the screen** (noVNC) and **copy the AI endpoint** (MCP URL + key) per box.
+- **Transfer data** between the `shared` folders of two boxes.
+
 ## Slimming down as much as possible (RAM, CPU, disk)
 
 New installations already ship slim by default (**4 GB RAM, 2 cores, thin disk**).
-For an **already-installed** box, run **`slim.bat`**: it converts the disk to `qcow2`
-(thin) and applies the limits **without reinstalling** (it preserves Windows, the Steam login, and the game).
+For an **already-installed** box, run **`slim.bat`**: it converts the disk to `qcow2` (thin) and
+applies the limits **without reinstalling** (it preserves Windows and everything installed in it).
 
 What each setting does:
 
 - **Disk: `DISK_FMT=qcow2`** — the biggest win. The disk becomes *thin* and only takes up what it
   actually uses (~15 GB instead of the 64 GB pre-allocated). To shrink it as much as possible, once
   inside the box run `defrag C: /O` from an admin prompt and restart the box.
-- **RAM: `BOX_RAM_SIZE=4G`** — a debloated Win10 plus Steam and the game use ~2 GB; 4G leaves headroom.
+- **RAM: `BOX_RAM_SIZE=4G`** — a debloated Windows idles around ~2 GB; 4G leaves headroom.
 - **CPU: `BOX_CPU_CORES=2` + `BOX_CPUS=2.0`** — the box never uses more than 2 host cores.
-- **Automatic debloat** (in `setup.ps1`, on every boot): disables telemetry (DiagTrack), the indexer
-  (WSearch), SuperFetch (SysMain), and Defender's real-time protection (with Steam added as an exception).
-
-### The manual step that saves the most CPU: FPS cap
-
-Because the box has no GPU, DirectX runs in software (WARP) and CPU cost is roughly proportional to
-FPS. The game tries to run at 120/144 FPS in a tiny 100px window, which is pure waste. **In the TBH
-settings, enable the FPS cap and set it to 20-30** (and quality to minimum). That alone cuts most of
-the CPU usage. Optional: in Steam, right-click TBH → Properties → Launch options → `-force-d3d11`.
+- **Automatic debloat** (in `oem/setup.ps1`, on every boot): disables telemetry (DiagTrack), the
+  indexer (WSearch), SuperFetch (SysMain), and Defender's real-time protection.
 
 ### An even leaner base (optional)
 
 For a new installation, leaving **no `.iso` in the folder** and setting `BOX_VERSION=win10x64-ltsc` in
 `.env` uses **Windows 10 LTSC** — the cleanest Win10 available (no Store/Cortana/Xbox, still updatable,
 supported until 2027; `win10x64-iot` runs until 2032). This is safer and lighter than manually stripping
-components out of an ISO (over-stripping breaks Steam and the game — Media Foundation, d3dcompiler_47,
-WMIC, and the Segoe fonts are all required).
+components out of an ISO (over-stripping breaks common runtime dependencies — Media Foundation,
+d3dcompiler_47, WMIC, and the Segoe fonts are all needed by many apps).
 
 ## Connecting AI agents
 
@@ -86,7 +90,7 @@ WMIC, and the Segoe fonts are all required).
 ```json
 {
   "mcpServers": {
-    "tbh-box": {
+    "nexo-box": {
       "type": "http",
       "url": "http://localhost:8000/mcp",
       "headers": { "Authorization": "Bearer <MCP_AUTH_KEY from .env>" }
@@ -98,8 +102,8 @@ WMIC, and the Segoe fonts are all required).
 **An AI without MCP support**: use the noVNC screen (`http://localhost:8006`) with any computer-use
 stack (page screenshot + clicks via Playwright/CDP).
 
-Inside the game and Steam the AI must operate **by vision and coordinates** (Screenshot → Click):
-the accessibility tree (the `Snapshot` tool) cannot see DirectX games.
+For apps that don't expose an accessibility tree (many games and DirectX/GPU apps), the AI should
+operate **by vision and coordinates** (Screenshot → Click) rather than the `Snapshot` tool.
 
 ## Configuration
 
@@ -123,16 +127,18 @@ travels through the `shared/` folder and the MCP server inside the box restarts 
 ```
 box/
 ├── install.bat          # one-click host installer (idempotent, resumes after reboot)
-├── scripts/install.ps1  # installer logic (WSL2 → Docker Desktop → .env → compose up)
+├── scripts/install.ps1  # installer logic (WSL2 -> Docker Desktop -> .env -> compose up)
 ├── compose.yml          # the box itself (dockur/windows)
 ├── oem/                 # runs INSIDE the guest, automatically at the end of Windows setup
 │   ├── install.bat      #   firewall + schedules setup on each logon
-│   ├── setup.ps1        #   Steam + uv + Windows-MCP + shortcuts + power (idempotent)
+│   ├── setup.ps1        #   AI server (Windows-MCP) + tools + power settings (idempotent)
+│   ├── optimize.ps1     #   one-time aggressive Windows debloat/cleanup
 │   └── mcp.key          #   MCP key frozen at install time (generated by the installer)
-├── storage/             # the box's Windows disk (persistent; do not commit)
-├── shared/              # live host ↔ box folder ("Shared" on the desktop; carries the current mcp.key)
-├── start/stop/status.bat, connect-claude.bat
-└── docs/architecture.md  # research that led to this architecture
+├── nexo/                # NexoGate dashboard (PowerShell HTTP server + web UI)
+├── storage/             # the box's Windows disk (persistent; not committed)
+├── shared/              # live host <-> box folder ("Shared" on the desktop; carries the current mcp.key)
+├── start/stop/status.bat, connect-claude.bat, slim.bat, nexo.bat
+└── docs/architecture.md # research that led to this architecture
 ```
 
 ## Security and warnings
@@ -140,12 +146,11 @@ box/
 - All ports are bound to `127.0.0.1` — **nothing is exposed on the network**. To reach the box from
   another PC on the local network, replace `127.0.0.1:` with `0.0.0.0:` in `compose.yml` (the MCP key
   then becomes your only protection; consider changing the RDP password too).
+- The default box credentials are `Docker` / `admin` (change `BOX_PASSWORD` in `.env`).
 - The Windows image downloaded by dockur/windows comes **without activation** — use your own license
   to activate it.
-- **ToS/ban risk**: TBH has server-side validation and real-money items on the Steam Market.
-  An AI *playing for you* (automated farming) may violate the Steam and game terms and put your
-  account at risk. Use AI access responsibly (assistance, reading the screen, navigation).
-- The Steam login is saved **inside the box's disk** (`storage/`). Do not share that folder.
+- Anything you sign into inside the box (accounts, tokens) is saved **inside the box's disk**
+  (`storage/`). Do not share that folder.
 
 ## Troubleshooting
 
@@ -165,8 +170,10 @@ box/
   key via `shared/`) and restart the box (`stop.bat` + `start.bat`).
 - **MCP Screenshot is black or errors out**: someone used RDP and disconnected — connect through noVNC
   (`http://localhost:8006`) and log in to return the display to the session.
-- **Performance**: the guest renders DirectX in software (WARP). For this game (a ~100 px window) that
-  is enough; close other heavy programs if it stutters.
+- **Wrong clock / "bad date" errors in apps**: the guest RTC can drift on a VM. `oem/setup.ps1` sets
+  `RealTimeIsUniversal=1` and resyncs the time on every boot to keep it correct.
+- **Performance**: the guest renders DirectX in software (WARP), since there is no GPU. That is fine
+  for lightweight windows; close other heavy programs if it stutters.
 
 ## Built on
 
