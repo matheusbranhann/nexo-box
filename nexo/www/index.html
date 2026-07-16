@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="NexoGate — Windows instance orchestrator for Steam and AI.">
+  <meta name="theme-color" content="#07101f">
+  <title>NexoGate — Instances</title>
+  <link rel="icon" href="logo.png" type="image/png">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <svg class="svg-sprite" aria-hidden="true">
+    <symbol id="i-grid" viewBox="0 0 24 24"><path d="M4 4h6v6H4zM14 4h6v6h-6zM4 14h6v6H4zM14 14h6v6h-6z"/></symbol>
+    <symbol id="i-monitor" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 4.5 5v6c0 5 3.2 9.4 7.5 11 4.3-1.6 7.5-6 7.5-11V5z"/><path d="m9 12 2 2 4-4"/></symbol>
+    <symbol id="i-bolt" viewBox="0 0 24 24"><path d="m13 2-8 12h7l-1 8 8-12h-7z"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14M14 7l5 5-5 5"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></symbol>
+    <symbol id="i-chevron" viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></symbol>
+    <symbol id="i-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="11" rx="2"/><path d="M16 8V5a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h3"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-play" viewBox="0 0 24 24"><path d="M6 4l14 8-14 8z"/></symbol>
+    <symbol id="i-power" viewBox="0 0 24 24"><path d="M12 3v9"/><path d="M6.5 7a8 8 0 1 0 11 0"/></symbol>
+    <symbol id="i-trash" viewBox="0 0 24 24"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 11a8 8 0 1 0-2 6m2 2v-5h-5"/></symbol>
+    <symbol id="i-external" viewBox="0 0 24 24"><path d="M14 4h6v6M20 4l-9 9M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/></symbol>
+    <symbol id="i-key" viewBox="0 0 24 24"><circle cx="8" cy="15" r="4"/><path d="M11 12l9-9M17 6l2 2M14 9l2 2"/></symbol>
+    <symbol id="i-swap" viewBox="0 0 24 24"><path d="M7 4 4 7l3 3M4 7h13M17 20l3-3-3-3M20 17H7"/></symbol>
+    <symbol id="i-book" viewBox="0 0 24 24"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3H11v17H6.5A2.5 2.5 0 0 0 4 22zm16 0A2.5 2.5 0 0 0 17.5 3H13v17h4.5A2.5 2.5 0 0 1 20 22z"/></symbol>
+    <symbol id="i-cpu" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></symbol>
+    <symbol id="i-hdd" viewBox="0 0 24 24"><rect x="3" y="13" width="18" height="7" rx="1"/><path d="M6 13 9 4h6l3 9M7 16.5h.01"/></symbol>
+  </svg>
+
+  <div class="telemetry-bar">
+    <span>NEXO://ORCHESTRATOR</span>
+    <span class="telemetry-center" id="tel-host">HOST · —</span>
+    <span><i class="live-dot" id="tel-dot"></i> <span id="tel-status">CONNECTING...</span></span>
+  </div>
+
+  <header class="site-header">
+    <a class="brand" data-route="dashboard" aria-label="NexoGate home">
+      <span class="brand-art"><img src="logo.png" alt=""></span>
+      <span class="brand-name">Nexo<span>Gate</span></span>
+      <span class="product-tag">ORCHESTRATOR</span>
+    </a>
+    <nav class="site-nav" aria-label="Main navigation">
+      <a data-route="dashboard" class="active"><svg><use href="#i-grid"/></svg>Instances</a>
+      <a data-route="transfer"><svg><use href="#i-swap"/></svg>Transfer</a>
+      <a data-route="docs"><svg><use href="#i-book"/></svg>Guide</a>
+    </nav>
+    <div class="header-actions">
+      <button class="header-button" id="btn-refresh"><svg><use href="#i-refresh"/></svg> Refresh</button>
+      <button class="header-button solid" id="btn-new"><svg><use href="#i-plus"/></svg> New instance</button>
+    </div>
+  </header>
+
+  <main id="app">
+    <!-- DASHBOARD -->
+    <section class="page" data-page="dashboard">
+      <div class="page-intro">
+        <div>
+          <p class="eyebrow"><span>01</span> OPERATIONAL VIEW</p>
+          <h1>Your instances,<br>under <em>control.</em></h1>
+          <p class="intro-copy">Create, clone, and delete Windows instances from the base, monitor usage in real time, and transfer data between them.</p>
+        </div>
+        <div class="intro-meta">
+          <span>BASE / TEMPLATE</span>
+          <strong id="meta-base">—</strong>
+          <small id="meta-base-sub">DISK · —</small>
+        </div>
+      </div>
+
+      <div class="metric-grid" id="metric-grid">
+        <article class="metric-card metric-primary">
+          <div class="card-top"><span class="card-label">DOCKER</span><svg><use href="#i-shield"/></svg></div>
+          <strong id="m-docker">—</strong>
+          <p><i class="live-dot" id="m-docker-dot"></i> <span id="m-docker-sub">checking</span></p>
+        </article>
+        <article class="metric-card">
+          <div class="card-top"><span class="card-label">INSTANCES</span><span class="trend positive" id="m-run-trend">—</span></div>
+          <strong id="m-total">0 <small>/ active</small></strong>
+          <div class="spark-bars" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+        </article>
+        <article class="metric-card">
+          <div class="card-top"><span class="card-label">TOTAL DISK</span><svg><use href="#i-hdd"/></svg></div>
+          <strong id="m-disk">0 <small>GB</small></strong>
+          <p id="m-disk-sub">base + instances</p>
+          <div class="capacity"><span id="m-disk-bar" style="width:0%"></span></div>
+        </article>
+        <article class="metric-card">
+          <div class="card-top"><span class="card-label">HOST RAM</span><svg><use href="#i-cpu"/></svg></div>
+          <strong id="m-ram">— <small>GB free</small></strong>
+          <p id="m-cpu-sub">—</p>
+        </article>
+      </div>
+
+      <div class="dashboard-grid">
+        <section class="data-panel">
+          <div class="panel-heading">
+            <div>
+              <p class="eyebrow"><span>02</span> FLEET</p>
+              <h2>Instances</h2>
+            </div>
+            <label class="search-field">
+              <svg><use href="#i-search"/></svg>
+              <input id="inst-search" type="search" placeholder="Search instance...">
+            </label>
+          </div>
+          <div class="gateway-table-wrap">
+            <table class="gateway-table">
+              <thead><tr><th>Instance</th><th>Ports</th><th>CPU</th><th>RAM</th><th>Disk</th><th>Status</th><th></th></tr></thead>
+              <tbody id="inst-list">
+                <tr class="empty-row"><td colspan="7">Loading...</td></tr>
+              </tbody>
+            </table>
+          </div>
+          <div class="panel-footer"><span id="inst-count">—</span><button type="button" class="plain-button" id="btn-refresh2">Reload <svg><use href="#i-refresh"/></svg></button></div>
+        </section>
+
+        <aside class="quick-panel">
+          <p class="eyebrow"><span>03</span> NEW INSTANCE</p>
+          <h2>Clone from base</h2>
+          <p>A full copy of Windows already optimized with Steam and the game. Ready in minutes.</p>
+          <form id="create-form">
+            <label class="field-label">NAME (a-z, 0-9, hyphen)</label>
+            <div class="input-shell"><input id="c-name" placeholder="player-02" maxlength="24" required></div>
+            <label class="field-label">SOURCE</label>
+            <div class="input-shell"><select id="c-source"><option value="base">Base (template)</option></select></div>
+            <div class="field-pair">
+              <div>
+                <label class="field-label">RAM</label>
+                <div class="input-shell"><select id="c-ram"><option>3G</option><option selected>4G</option><option>6G</option><option>8G</option></select></div>
+              </div>
+              <div>
+                <label class="field-label">CORES</label>
+                <div class="input-shell"><select id="c-cpu"><option>2</option><option>3</option><option>4</option></select></div>
+              </div>
+            </div>
+            <button class="button primary full" type="submit">Create instance <svg><use href="#i-arrow"/></svg></button>
+            <p class="form-message" id="create-status" aria-live="polite"></p>
+          </form>
+          <div class="secure-note"><svg><use href="#i-key"/></svg><span><strong>Unique MCP key per instance</strong>Each copy gets isolated AI access</span></div>
+        </aside>
+      </div>
+
+      <section class="activity-strip">
+        <div class="activity-title"><p class="eyebrow"><span>04</span> ACTIVITY</p><h2>Latest events</h2></div>
+        <ol id="activity-list">
+          <li><i class="event-dot"></i><span><strong>Waiting for events</strong><small>actions appear here</small></span><time>—</time></li>
+        </ol>
+      </section>
+    </section>
+
+    <!-- TRANSFER -->
+    <section class="page" data-page="transfer" hidden>
+      <div class="page-intro">
+        <div>
+          <p class="eyebrow"><span>01</span> DATA</p>
+          <h1>Transfer<br>between <em>instances.</em></h1>
+          <p class="intro-copy">Copy files from one instance's shared folder to another. Useful for migrating saves, configs, or payloads between copies.</p>
+        </div>
+      </div>
+      <div class="transfer-grid">
+        <div class="transfer-col">
+          <label class="field-label">SOURCE</label>
+          <div class="input-shell"><select id="t-from"></select></div>
+          <p style="color:var(--faint);font:8px/1.5 var(--mono);letter-spacing:.08em">Copies the files from this instance's <code>shared</code> folder.</p>
+        </div>
+        <div class="transfer-arrow"><svg><use href="#i-arrow"/></svg></div>
+        <div class="transfer-col">
+          <label class="field-label">DESTINATION</label>
+          <div class="input-shell"><select id="t-to"></select></div>
+          <button class="button primary full" id="btn-transfer" style="margin-top:8px">Transfer data <svg><use href="#i-swap"/></svg></button>
+          <p class="form-message" id="transfer-status"></p>
+        </div>
+      </div>
+    </section>
+
+    <!-- DOCS -->
+    <section class="page" data-page="docs" hidden>
+      <div class="page-intro">
+        <div>
+          <p class="eyebrow"><span>01</span> GUIDE</p>
+          <h1>How the orchestrator<br><em>works.</em></h1>
+        </div>
+      </div>
+      <div class="docs-body">
+        <h2>Base and clones</h2>
+        <p>The original instance (the box already installed and optimized) is the <strong>template</strong>. Each new instance is a copy of its disk (<code>data.qcow2</code>) — it comes with Windows, Steam, and the game ready to go. Only the AI key and the ports change.</p>
+        <h2>Ports per instance</h2>
+        <p>Each instance gets its own ports on <code>127.0.0.1</code>: the screen (noVNC) on <code>810X</code>, RDP on <code>820X</code>, and the MCP (AI) server on <code>830X</code>. Open the screen with the monitor button in the table.</p>
+        <h2>Usage</h2>
+        <p>Live CPU and RAM come from <code>docker stats</code>; the disk is the real size of <code>data.qcow2</code> (thin). The header shows the host total.</p>
+        <h2>Data transfer</h2>
+        <p>On the Transfer tab, copy files between the instances' <code>shared</code> folders — they appear as the <code>\\host.lan\Data</code> folder inside each Windows.</p>
+        <div class="callout"><svg style="color:var(--cyan)"><use href="#i-shield"/></svg><span>Everything runs locally on your PC. No port is exposed to the network — only <code>127.0.0.1</code>.</span></div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <a class="footer-brand" data-route="dashboard"><span>Nexo</span>Gate</a>
+    <span id="footer-count">© 2026 NEXOGATE · LOCAL ORCHESTRATOR</span>
+    <nav><a data-route="docs">GUIDE</a><a data-route="transfer">TRANSFER</a></nav>
+  </footer>
+
+  <div id="modal-root"></div>
+  <div class="toast-wrap" id="toast-root"></div>
+  <script src="app.js"></script>
+</body>
+</html>

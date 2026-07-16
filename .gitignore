@@ -1,0 +1,24 @@
+# --- local box state - never commit ---
+storage/
+instances/
+shared/
+.env
+compose.override.yml
+
+# runtime markers and generated files
+nexo/active.url
+oem/mcp.key
+oem/served.key
+oem/mcp.pid
+oem/optimized.done
+*.log
+
+# disk images (belt and suspenders)
+*.qcow2
+*.img
+
+# the user's local Windows ISO (auto-detected at runtime)
+*.iso
+
+# Claude Code skills (junctions to an external library) + local agent config
+.claude/
