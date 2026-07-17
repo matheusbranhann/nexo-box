@@ -18,6 +18,9 @@ oem/optimized.done
 *.qcow2
 *.img
 
+# QEMU runtime (downloaded/installed by the Windows 10 engine)
+qemu/
+
 # the user's local Windows ISO (auto-detected at runtime)
 *.iso
 

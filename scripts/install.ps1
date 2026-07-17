@@ -66,7 +66,14 @@ Write-Host '============================================'
 Write-Step 'Checking prerequisites'
 $os = Get-CimInstance Win32_OperatingSystem
 if ([int]$os.BuildNumber -lt 22000) {
-    throw "Windows 11 is required for dockur/windows via Docker Desktop (current build: $($os.BuildNumber))."
+    # Windows 10: dockur/windows can't run here (no /dev/kvm on Win10 WSL2).
+    # Switch to the native QEMU + WHPX engine, which does not need Docker/WSL.
+    Write-Host ''
+    Write-Host "    Windows 10 detected (build $($os.BuildNumber))."
+    Write-Host '    dockur/windows requires Windows 11, so switching to the native'
+    Write-Host '    QEMU + WHPX engine for Windows 10 (no Docker/WSL required)...'
+    & (Join-Path $PSScriptRoot 'install-qemu.ps1')
+    exit $LASTEXITCODE
 }
 $cs  = Get-CimInstance Win32_ComputerSystem
 $cpu = Get-CimInstance Win32_Processor | Select-Object -First 1

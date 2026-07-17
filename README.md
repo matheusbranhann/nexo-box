@@ -1,10 +1,17 @@
 # Nexo Box
 
-A one-click system that runs a real, disposable **Windows desktop inside a container**
-([dockur/windows](https://github.com/dockur/windows)), **fully controllable by any AI agent**
-via [Windows-MCP](https://github.com/CursorTouch/Windows-MCP) (screenshot + mouse/keyboard + PowerShell)
-and through a noVNC/RDP screen. It ships with **NexoGate**, a local web dashboard to create, clone,
-monitor, and delete boxes.
+A one-click system that runs a real, disposable **Windows desktop**, **fully controllable by any AI
+agent** via [Windows-MCP](https://github.com/CursorTouch/Windows-MCP) (screenshot + mouse/keyboard +
+PowerShell) and through a screen (noVNC/RDP or VNC). It ships with **NexoGate**, a local web dashboard
+to create, clone, monitor, and delete boxes.
+
+The installer picks an engine automatically based on the host:
+
+- **Windows 11** -> the box runs **inside a container** ([dockur/windows](https://github.com/dockur/windows),
+  KVM via WSL2 nested virtualization).
+- **Windows 10** -> the box runs on **native QEMU with the Windows Hypervisor Platform (WHPX)**, since
+  dockur/windows requires Windows 11 (Windows 10 cannot expose `/dev/kvm` to containers). No Docker or
+  WSL needed. A local Windows `.iso` next to `install.bat` is required on this engine.
 
 ## Installation (any PC)
 
@@ -16,8 +23,10 @@ monitor, and delete boxes.
    server (AI access) and whatever else `oem/setup.ps1` defines. From there, connect an AI agent, use
    the box through the browser screen, and install any software you need inside it.
 
-**Host requirements**: Windows 11, virtualization enabled in the BIOS (Intel VT-x / AMD SVM),
-16 GB of RAM recommended, ~30 GB of free disk space, an internet connection.
+**Host requirements**: Windows 10 or 11, virtualization enabled in the BIOS (Intel VT-x / AMD SVM),
+16 GB of RAM recommended, ~30 GB of free disk space, an internet connection. On **Windows 10** you also
+need a Windows `.iso` in this folder (the QEMU engine installs the guest from it) and the installer
+enables the "Windows Hypervisor Platform" feature (one reboot; it resumes on its own).
 
 ## Day-to-day
 
@@ -44,6 +53,20 @@ The MCP authentication key is stored in `.env` (`MCP_AUTH_KEY`); `status.bat` pr
 > noVNC mirrors. When you disconnect RDP, the session is left without a display and the
 > **MCP Screenshot stops working** until you log in again through noVNC (or restart the box).
 > Prefer noVNC for day-to-day use.
+
+## Windows 10 (QEMU engine)
+
+On a Windows 10 host the box runs on native QEMU (legacy BIOS + AHCI + e1000, so no extra drivers are
+needed) accelerated by WHPX. Everything else — NexoGate, cloning, Windows-MCP — works the same. What
+differs:
+
+- **A local Windows `.iso` is required** next to `install.bat`; QEMU installs the guest from it hands-off
+  (20–40 min) the first time. The result is the base template (`storage\base.qcow2`).
+- **Screen is VNC** (not noVNC): the base is at `127.0.0.1:5900`, instance N at `127.0.0.1:590N`. Use any
+  VNC viewer. **RDP** (`127.0.0.1:3389` base, `+N` per instance; user `Docker` / password `admin`) and
+  **Windows-MCP** (`127.0.0.1:8000` base, `+N` per instance) work as usual.
+- File transfer via NexoGate's Transfer tab is Docker-engine only for now; on Windows 10 move files
+  through RDP or the MCP PowerShell tool.
 
 ## NexoGate — managing many boxes
 

@@ -1,0 +1,200 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Nexo Box - unattended answer file for the NATIVE QEMU + WHPX engine (Windows 10 host).
+  Differences from the dockur (Docker/UEFI) answer file:
+   - LEGACY BIOS / MBR single active partition (WHPX breaks OVMF/UEFI pflash).
+   - No virtio balloon service install (guest uses AHCI + e1000, in-box drivers).
+   - No \\host.lan\Data mapping; provisioning is bootstrapped from the config CD instead.
+  Windows Setup scans the root of every removable drive for autounattend.xml, so this
+  file is delivered on a second CD-ROM built by the engine (no need to touch the ISO).
+-->
+<unattend xmlns="urn:schemas-microsoft-com:unattend" xmlns:wcm="http://schemas.microsoft.com/WMIConfig/2002/State">
+  <settings pass="windowsPE">
+    <component name="Microsoft-Windows-International-Core-WinPE" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <SetupUILanguage>
+        <UILanguage>en-US</UILanguage>
+      </SetupUILanguage>
+      <InputLocale>0409:00000409</InputLocale>
+      <SystemLocale>en-US</SystemLocale>
+      <UILanguage>en-US</UILanguage>
+      <UserLocale>en-US</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <DiskConfiguration>
+        <Disk wcm:action="add">
+          <DiskID>0</DiskID>
+          <WillWipeDisk>true</WillWipeDisk>
+          <CreatePartitions>
+            <!-- One primary NTFS partition, marked active (BIOS/MBR boot) -->
+            <CreatePartition wcm:action="add">
+              <Order>1</Order>
+              <Type>Primary</Type>
+              <Extend>true</Extend>
+            </CreatePartition>
+          </CreatePartitions>
+          <ModifyPartitions>
+            <ModifyPartition wcm:action="add">
+              <Order>1</Order>
+              <PartitionID>1</PartitionID>
+              <Label>Windows</Label>
+              <Letter>C</Letter>
+              <Format>NTFS</Format>
+              <Active>true</Active>
+            </ModifyPartition>
+          </ModifyPartitions>
+        </Disk>
+      </DiskConfiguration>
+      <ImageInstall>
+        <OSImage>
+          <InstallTo>
+            <DiskID>0</DiskID>
+            <PartitionID>1</PartitionID>
+          </InstallTo>
+          <InstallToAvailablePartition>false</InstallToAvailablePartition>
+        </OSImage>
+      </ImageInstall>
+      <UserData>
+        <AcceptEula>true</AcceptEula>
+        <FullName>Docker</FullName>
+        <Organization>Nexo Box</Organization>
+        <ProductKey>
+          <Key>VK7JG-NPHTM-C97JM-9MPGT-3V66T</Key>
+        </ProductKey>
+      </UserData>
+      <EnableFirewall>false</EnableFirewall>
+      <Diagnostics>
+        <OptIn>false</OptIn>
+      </Diagnostics>
+    </component>
+  </settings>
+  <settings pass="offlineServicing">
+    <component name="Microsoft-Windows-LUA-Settings" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <EnableLUA>false</EnableLUA>
+    </component>
+  </settings>
+  <settings pass="generalize">
+    <component name="Microsoft-Windows-PnPSysprep" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <PersistAllDeviceInstalls>true</PersistAllDeviceInstalls>
+    </component>
+    <component name="Microsoft-Windows-Security-SPP" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <SkipRearm>1</SkipRearm>
+    </component>
+  </settings>
+  <settings pass="specialize">
+    <component name="Microsoft-Windows-Security-SPP-UX" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <SkipAutoActivation>true</SkipAutoActivation>
+    </component>
+    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <ComputerName>*</ComputerName>
+    </component>
+    <component name="Microsoft-Windows-ErrorReportingCore" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <DisableWER>1</DisableWER>
+    </component>
+    <component name="Microsoft-Windows-SystemRestore-Main" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <DisableSR>1</DisableSR>
+    </component>
+    <component name="Microsoft-Windows-International-Core" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <InputLocale>0409:00000409</InputLocale>
+      <SystemLocale>en-US</SystemLocale>
+      <UILanguage>en-US</UILanguage>
+      <UserLocale>en-US</UserLocale>
+    </component>
+    <component name="Microsoft-Windows-Deployment" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <RunSynchronous>
+        <RunSynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <Path>reg.exe add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\OOBE" /v BypassNRO /t REG_DWORD /d 1 /f</Path>
+        </RunSynchronousCommand>
+      </RunSynchronous>
+    </component>
+    <component name="Microsoft-Windows-TerminalServices-LocalSessionManager" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <fDenyTSConnections>false</fDenyTSConnections>
+    </component>
+    <component name="Microsoft-Windows-TerminalServices-RDP-WinStationExtensions" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <UserAuthentication>0</UserAuthentication>
+    </component>
+    <component name="Networking-MPSSVC-Svc" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <FirewallGroups>
+        <FirewallGroup wcm:action="add" wcm:keyValue="RemoteDesktop">
+          <Active>true</Active>
+          <Profile>all</Profile>
+          <Group>@FirewallAPI.dll,-28752</Group>
+        </FirewallGroup>
+      </FirewallGroups>
+    </component>
+  </settings>
+  <settings pass="auditSystem" />
+  <settings pass="auditUser" />
+  <settings pass="oobeSystem">
+    <component name="Microsoft-Windows-Shell-Setup" processorArchitecture="amd64" publicKeyToken="31bf3856ad364e35" language="neutral" versionScope="nonSxS">
+      <UserAccounts>
+        <LocalAccounts>
+          <LocalAccount wcm:action="add">
+            <Name>Docker</Name>
+            <Group>Administrators</Group>
+            <Password>
+              <Value>admin</Value>
+              <PlainText>true</PlainText>
+            </Password>
+          </LocalAccount>
+        </LocalAccounts>
+        <AdministratorPassword>
+          <Value>admin</Value>
+          <PlainText>true</PlainText>
+        </AdministratorPassword>
+      </UserAccounts>
+      <AutoLogon>
+        <Username>Docker</Username>
+        <Enabled>true</Enabled>
+        <LogonCount>65432</LogonCount>
+        <Password>
+          <Value>admin</Value>
+          <PlainText>true</PlainText>
+        </Password>
+      </AutoLogon>
+      <Display>
+        <ColorDepth>32</ColorDepth>
+        <HorizontalResolution>1280</HorizontalResolution>
+        <VerticalResolution>720</VerticalResolution>
+      </Display>
+      <OOBE>
+        <HideEULAPage>true</HideEULAPage>
+        <HideLocalAccountScreen>true</HideLocalAccountScreen>
+        <HideOEMRegistrationScreen>true</HideOEMRegistrationScreen>
+        <HideOnlineAccountScreens>true</HideOnlineAccountScreens>
+        <HideWirelessSetupInOOBE>true</HideWirelessSetupInOOBE>
+        <NetworkLocation>Home</NetworkLocation>
+        <ProtectYourPC>3</ProtectYourPC>
+        <SkipUserOOBE>true</SkipUserOOBE>
+        <SkipMachineOOBE>true</SkipMachineOOBE>
+      </OOBE>
+      <FirstLogonCommands>
+        <SynchronousCommand wcm:action="add">
+          <Order>1</Order>
+          <CommandLine>cmd /C wmic useraccount where name="Docker" set PasswordExpires=false</CommandLine>
+          <Description>Password never expires</Description>
+        </SynchronousCommand>
+        <SynchronousCommand wcm:action="add">
+          <Order>2</Order>
+          <CommandLine>cmd /C POWERCFG -H OFF</CommandLine>
+          <Description>Disable hibernation</Description>
+        </SynchronousCommand>
+        <SynchronousCommand wcm:action="add">
+          <Order>3</Order>
+          <CommandLine>reg.exe add "HKLM\SOFTWARE\Policies\Microsoft\Windows\WindowsUpdate\AU" /v "NoAutoUpdate" /t REG_DWORD /d 1 /f</CommandLine>
+          <Description>Turn off Windows Update auto download</Description>
+        </SynchronousCommand>
+        <SynchronousCommand wcm:action="add">
+          <Order>4</Order>
+          <CommandLine>reg.exe add "HKCU\SOFTWARE\Microsoft\Windows\CurrentVersion\Explorer\Advanced" /v "HideFileExt" /t REG_DWORD /d 0 /f</CommandLine>
+          <Description>Show file extensions</Description>
+        </SynchronousCommand>
+        <SynchronousCommand wcm:action="add">
+          <Order>9</Order>
+          <CommandLine>cmd /C for %i in (D E F G H I J K L M N O P Q R S T U V W X Y Z) do @if exist "%i:\bootstrap.cmd" call "%i:\bootstrap.cmd"</CommandLine>
+          <Description>Bootstrap Nexo Box provisioning from the config CD</Description>
+        </SynchronousCommand>
+      </FirstLogonCommands>
+    </component>
+  </settings>
+</unattend>
