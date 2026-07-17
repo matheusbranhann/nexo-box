@@ -49,6 +49,10 @@ try {
     Set-Content (Join-Path $dir 'shared\mcp.key') -Value $j.mcpKey -Encoding ascii -NoNewline
     # forces setup.ps1 to restart the MCP with the new key (old marker != new)
     Remove-Item (Join-Path $dir 'oem\served.key') -Force -ErrorAction SilentlyContinue
+    # carry the optional app id (if any) to the clone's live shared folder
+    if (Test-Path (Join-Path $dir 'oem\app.id')) {
+        Copy-Item (Join-Path $dir 'oem\app.id') (Join-Path $dir 'shared\app.id') -Force -ErrorAction SilentlyContinue
+    }
 
     # 3. .env + compose.yml for the instance
     @(

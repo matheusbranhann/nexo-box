@@ -7,6 +7,7 @@ compose.override.yml
 
 # runtime markers and generated files
 nexo/active.url
+oem/app.id
 oem/mcp.key
 oem/served.key
 oem/mcp.pid

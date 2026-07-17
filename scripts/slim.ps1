@@ -2,7 +2,7 @@
 #  Nexo Box - Slim down an ALREADY-INSTALLED box (no reinstall)
 #  - raw 64 GB disk -> thin qcow2 (~15 GB): dockur converts on boot
 #  - RAM 4G, 2 cores, hard 2-CPU host cap
-#  Preserves Windows + the Steam login + the installed game.
+#  Preserves Windows and everything installed in it.
 # ============================================================
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -25,7 +25,7 @@ Write-Host ' Nexo Box - Slim down an existing box'
 Write-Host '============================================'
 Write-Host ''
 Write-Host ' This will SHUT the box DOWN for a few minutes and convert the disk.'
-Write-Host ' Your Windows, the Steam login, and the game are preserved.'
+Write-Host ' Your Windows and everything installed in it are preserved.'
 $ans = Read-Host ' Continue? (Y/N)'
 if ($ans -notmatch '^[yY]') { Write-Host 'Cancelled.'; exit 0 }
 

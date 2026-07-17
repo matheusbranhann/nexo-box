@@ -1,10 +1,10 @@
 # ============================================================
-#  TBH Box - Guest setup (runs at every logon; idempotent)
-#  - Installs Steam (silent, with retry)
+#  Nexo Box - Guest setup (runs at every logon; idempotent)
+#  - Optionally installs a Steam app (only if STEAM_APP_ID is configured)
 #  - Installs uv + Windows-MCP (access server for AI agents)
 #  - Starts the MCP server on port 8000 (key: \\host.lan\Data\mcp.key
 #    with fallback to C:\OEM\mcp.key; a key change restarts the server)
-#  - Creates game shortcuts and adjusts power settings
+#  - Adjusts power settings (and creates app shortcuts if configured)
 # ============================================================
 $ErrorActionPreference = 'Continue'
 try { Start-Transcript -Path 'C:\OEM\setup.log' -Append | Out-Null } catch { }
@@ -59,9 +59,9 @@ powercfg /hibernate off 2>$null   # remove hiberfil.sys (saves disk/RAM)
 
 # ---------- aggressive Windows optimization (runs ONCE, in the background) ----------
 # optimize.ps1 disables ~28 services + background tasks, tweaks the registry,
-# puts Defender in passive mode and cleans up the disk. Safe: it does not touch Steam,
-# the game, networking, the DWM or the MCP itself (it has an exclusion list). Guarded by
-# a marker so the heavy cleanup does not repeat at every logon.
+# puts Defender in passive mode and cleans up the disk. Safe: it does not touch
+# installed apps, networking, the DWM or the MCP itself (it has an exclusion list).
+# Guarded by a marker so the heavy cleanup does not repeat at every logon.
 $optFlag = 'C:\OEM\optimized.done'
 if ((Test-Path 'C:\OEM\optimize.ps1') -and -not (Test-Path $optFlag)) {
     Write-Output 'Triggering Windows optimization (once, in the background)...'
@@ -69,10 +69,16 @@ if ((Test-Path 'C:\OEM\optimize.ps1') -and -not (Test-Path $optFlag)) {
     Set-Content -Path $optFlag -Value (Get-Date) -Encoding ascii
 }
 
-# ---------- Steam ----------
+# ---------- optional Steam app (only if a STEAM_APP_ID was configured) ----------
+# The app id travels via .env -> shared/app.id (live) or C:\OEM\app.id (baked at
+# install). Leave it unset for a plain box with no extra software installed.
+$appId = $null
+foreach ($p in '\\host.lan\Data\app.id', 'C:\OEM\app.id') {
+    try { if (Test-Path $p) { $v = ([string](Get-Content $p -Raw)).Trim(); if ($v) { $appId = $v; break } } } catch { }
+}
 $steamExe = "${env:ProgramFiles(x86)}\Steam\steam.exe"
-if (-not (Test-Path $steamExe)) {
-    Write-Output 'Downloading and installing Steam...'
+if ($appId -and -not (Test-Path $steamExe)) {
+    Write-Output 'Installing Steam...'
     Invoke-Retry {
         $tmp = Join-Path $env:TEMP 'SteamSetup.exe'
         Invoke-WebRequest -Uri 'https://cdn.fastly.steamstatic.com/client/installer/SteamSetup.exe' -OutFile $tmp -UseBasicParsing -ErrorAction Stop
@@ -163,16 +169,16 @@ if ((Test-Path $mcpExe) -and $key) {
     Write-Output 'WARNING: no MCP key found (shared/mcp.key or C:\OEM\mcp.key) - server not started.'
 }
 
-# ---------- game shortcuts (only once Steam exists) ----------
-if (Test-Path $steamExe) {
+# ---------- app shortcuts (only if configured and Steam is present) ----------
+if ($appId -and (Test-Path $steamExe)) {
     $desktop = [Environment]::GetFolderPath('Desktop')
-    $installShortcut = Join-Path $desktop 'Install TBH - Task Bar Hero.url'
+    $installShortcut = Join-Path $desktop 'Install.url'
     if (-not (Test-Path $installShortcut)) {
-        Set-Content -Path $installShortcut -Value "[InternetShortcut]`r`nURL=steam://install/3678970" -Encoding ascii
+        Set-Content -Path $installShortcut -Value "[InternetShortcut]`r`nURL=steam://install/$appId" -Encoding ascii
     }
-    $playShortcut = Join-Path $desktop 'Play TBH.url'
-    if (-not (Test-Path $playShortcut)) {
-        Set-Content -Path $playShortcut -Value "[InternetShortcut]`r`nURL=steam://rungameid/3678970" -Encoding ascii
+    $launchShortcut = Join-Path $desktop 'Launch.url'
+    if (-not (Test-Path $launchShortcut)) {
+        Set-Content -Path $launchShortcut -Value "[InternetShortcut]`r`nURL=steam://rungameid/$appId" -Encoding ascii
     }
 }
 

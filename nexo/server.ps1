@@ -119,7 +119,7 @@ function Get-Overview {
     $insts = @(Get-InstancesPayload)
     $running = @($insts | Where-Object { $_.status -eq 'running' }).Count
     $prov    = @($insts | Where-Object { $_.status -eq 'provisioning' }).Count
-    $diskSum = ($insts | Measure-Object diskGB -Sum).Sum
+    $diskSum = 0; foreach ($x in $insts) { $diskSum += [double]$x.diskGB }  # robust for zero instances
     $baseDisk = Get-OnDiskGB $BaseStorage
     $cs = Get-CimInstance Win32_ComputerSystem
     $avail = 0
@@ -191,18 +191,21 @@ function Invoke-Compose($name, $action) {
     if ($action -eq 'delete') { Remove-Item $dir -Recurse -Force -ErrorAction SilentlyContinue }
 }
 
-function Move-Data($from, $to) {
-    $src = Join-Path $InstDir "$from\shared"
-    $dst = Join-Path $InstDir "$to\shared"
-    if ($from -eq 'base') { $src = Join-Path $Root 'shared' }
-    if ($to   -eq 'base') { $dst = Join-Path $Root 'shared' }
-    if (-not (Test-Path $src)) { throw "Source has no shared folder." }
-    New-Item -ItemType Directory -Force -Path $dst | Out-Null
-    $n = 0
-    Get-ChildItem $src -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'mcp.key' } | ForEach-Object {
-        Copy-Item $_.FullName $dst -Force; $n++
+# shared folder for a box (or the base); files here show up as \\host.lan\Data in the guest
+function Get-SharedDir($name) {
+    if (-not $name -or $name -eq 'base') { return (Join-Path $Root 'shared') }
+    $safe = ($name -replace '[^a-zA-Z0-9\-]', '')
+    return (Join-Path $InstDir "$safe\shared")
+}
+function Get-SharedFiles($name) {
+    $dir = Get-SharedDir $name
+    $files = @()
+    if (Test-Path $dir) {
+        Get-ChildItem $dir -File -ErrorAction SilentlyContinue | Where-Object { $_.Name -ne 'mcp.key' } | ForEach-Object {
+            $files += [pscustomobject]@{ name = $_.Name; sizeKB = [math]::Round($_.Length / 1KB, 1) }
+        }
     }
-    return $n
+    return ,$files
 }
 
 # ============================================================
@@ -249,6 +252,24 @@ while ($listener.IsListening) {
         $req = $ctx.Request
         $path = $req.Url.LocalPath
         $method = $req.HttpMethod
+
+        # ---- file upload from the browser (raw body; must run BEFORE the JSON body read) ----
+        if ($path -eq '/api/upload' -and $method -eq 'POST') {
+            try {
+                $inst  = $req.QueryString['instance']
+                $fname = [IO.Path]::GetFileName([string]$req.QueryString['name'])
+                if (-not $fname) { throw 'Missing file name.' }
+                $dir = Get-SharedDir $inst
+                New-Item -ItemType Directory -Force -Path $dir | Out-Null
+                $dest = Join-Path $dir $fname
+                $fs = [IO.File]::Create($dest)
+                try { $req.InputStream.CopyTo($fs) } finally { $fs.Close() }
+                $size = (Get-Item $dest).Length
+                Send-Json $ctx @{ ok = $true; name = $fname; sizeKB = [math]::Round($size / 1KB, 1) }
+            } catch { Send-Json $ctx @{ error = "$_" } 400 }
+            continue
+        }
+
         $body = $null
         if ($method -eq 'POST' -and $req.HasEntityBody) {
             $reader = [IO.StreamReader]::new($req.InputStream, $req.ContentEncoding)
@@ -262,9 +283,21 @@ while ($listener.IsListening) {
         elseif ($path -eq '/api/instances' -and $method -eq 'POST') {
             try { Send-Json $ctx (New-Instance $body) } catch { Send-Json $ctx @{ error = "$_" } 400 }; continue
         }
-        elseif ($path -eq '/api/transfer' -and $method -eq 'POST') {
-            try { $n = Move-Data $body.from $body.to; Send-Json $ctx @{ ok=$true; copied=$n } }
-            catch { Send-Json $ctx @{ error="$_" } 400 }; continue
+        elseif ($path -eq '/api/files' -and $method -eq 'GET') {
+            Send-Json $ctx (Get-SharedFiles $req.QueryString['instance']); continue
+        }
+        elseif ($path -eq '/api/download' -and $method -eq 'GET') {
+            $inst = $req.QueryString['instance']; $fname = [IO.Path]::GetFileName([string]$req.QueryString['name'])
+            $file = Join-Path (Get-SharedDir $inst) $fname
+            if ($fname -and (Test-Path $file)) {
+                $fs = [IO.File]::OpenRead($file)
+                $ctx.Response.ContentType = 'application/octet-stream'
+                $ctx.Response.ContentLength64 = $fs.Length
+                $ctx.Response.AddHeader('Content-Disposition', "attachment; filename=""$fname""")
+                try { $fs.CopyTo($ctx.Response.OutputStream) } finally { $fs.Close() }
+                $ctx.Response.Close()
+            } else { $ctx.Response.StatusCode = 404; $ctx.Response.Close() }
+            continue
         }
         elseif ($path -match '^/api/instances/([a-z0-9\-]+)/(start|stop|restart|delete)$' -and $method -eq 'POST') {
             $n = $Matches[1]; $a = $Matches[2]

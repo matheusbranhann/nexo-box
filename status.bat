@@ -1,5 +1,5 @@
 @echo off
-rem TBH Box - shows the box state and the access details
+rem Nexo Box - shows the box state and the access details
 setlocal
 cd /d "%~dp0"
 setlocal enabledelayedexpansion

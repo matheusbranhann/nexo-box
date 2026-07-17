@@ -1,6 +1,6 @@
 @echo off
 rem ============================================================
-rem  TBH Box - one-click installer (host)
+rem  Nexo Box - one-click installer (host)
 rem  Copy the whole folder to the target PC and double-click here.
 rem  Safe to run multiple times: it resumes where it left off.
 rem ============================================================
@@ -11,8 +11,8 @@ rem -- requires administrator (auto-elevates; fltmc works even when the Server s
 fltmc >nul 2>&1
 if %errorlevel% neq 0 (
     echo Requesting administrator permission...
-    set "TBH_SELF=%~f0"
-    powershell -NoProfile -Command "Start-Process -FilePath $env:TBH_SELF -Verb RunAs"
+    set "NEXO_SELF=%~f0"
+    powershell -NoProfile -Command "Start-Process -FilePath $env:NEXO_SELF -Verb RunAs"
     if errorlevel 1 (
         echo.
         echo Permission denied or elevation failed.

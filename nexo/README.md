@@ -1,7 +1,7 @@
 # NexoGate — Instance Manager
 
 Web dashboard (NEXO design) to **create, clone, delete, and monitor** box
-instances (Windows + Steam + the game). The already-installed box is the
+instances (a Windows desktop). The already-installed box is the
 **base/template**; each instance is a copy of its disk, with its own ports and
 AI key.
 
@@ -16,7 +16,7 @@ free port). Close the console window to stop the server.
 
 ## What you can do
 
-- **Create / clone** — copies the base disk (Windows + Steam + game ready) and
+- **Create / clone** — copies the base disk (a ready-to-use Windows) and
   brings up a new instance with the RAM/cores you choose. Each one gets a unique
   MCP key.
 - **Start / stop / restart** each instance.

@@ -1,6 +1,6 @@
 # ============================================================
-#  TBH Box - AGGRESSIVE Windows optimization from the inside
-#  Safe: it does not touch Steam, the game, networking, the DWM or the MCP.
+#  Nexo Box - AGGRESSIVE Windows optimization from the inside
+#  Safe: it does not touch installed apps, networking, the DWM or the MCP.
 #  Idempotent. Writes a log to \\host.lan\Data\optimize-log.txt (= shared/).
 # ============================================================
 $ErrorActionPreference = 'Continue'
@@ -105,7 +105,6 @@ Log 'Registry adjusted (telemetry/suggestions/animations/prefetch/last-access)'
 try{
   Set-MpPreference -DisableRealtimeMonitoring $true -ErrorAction SilentlyContinue
   Set-MpPreference -MAPSReporting 0 -SubmitSamplesConsent 2 -DisableScanningNetworkFiles $true -ErrorAction SilentlyContinue
-  Set-MpPreference -ExclusionPath "${env:ProgramFiles(x86)}\Steam" -ErrorAction SilentlyContinue
   Add-MpPreference -ExclusionPath 'C:\OEM' -ErrorAction SilentlyContinue
 }catch{}
 

@@ -1,5 +1,5 @@
 @echo off
-rem TBH Box - registers the box as an MCP server in Claude Code on this PC
+rem Nexo Box - registers the box as an MCP server in Claude Code on this PC
 setlocal
 cd /d "%~dp0"
 
@@ -28,10 +28,10 @@ if %errorlevel% neq 0 (
 )
 
 rem "call" is mandatory: if claude is a .cmd (installed via npm), control never returns without it
-call claude mcp add --transport http tbh-box http://localhost:8000/mcp --header "Authorization: Bearer %KEY%"
+call claude mcp add --transport http nexo-box http://localhost:8000/mcp --header "Authorization: Bearer %KEY%"
 if %errorlevel% equ 0 (
     echo.
-    echo Done! In Claude Code, the box shows up as the MCP server "tbh-box".
-    echo Test it: ask "take a screenshot of tbh-box".
+    echo Done! In Claude Code, the box shows up as the MCP server "nexo-box".
+    echo Test it: ask "take a screenshot of nexo-box".
 )
 pause

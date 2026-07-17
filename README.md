@@ -83,6 +83,8 @@ d3dcompiler_47, WMIC, and the Segoe fonts are all needed by many apps).
 
 ## Connecting AI agents
 
+For a complete guide to controlling and modifying a box (MCP tools, PowerShell, noVNC/RDP, file transfer), see [docs/access.md](docs/access.md).
+
 **Claude Code**: run `connect-claude.bat`. Done.
 
 **Any other MCP client** (generic HTTP config):
@@ -117,6 +119,7 @@ Everything lives in `.env` (created by the installer):
 - `BOX_DISK_FMT=qcow2` — thin disk (uses ~15 GB). `raw` = pre-allocated (faster, uses the full size).
 - `BOX_USERNAME` / `BOX_PASSWORD` — the box's Windows account.
 - `MCP_AUTH_KEY` — the key AI agents use; randomly generated during install.
+- `STEAM_APP_ID` (optional) — a numeric Steam app id to auto-install; empty by default (a plain box).
 
 Changed `.env`? Run `install.bat` again (it re-propagates the key and recreates the container; the disk
 in `storage/` is preserved). Changing `MCP_AUTH_KEY` works without reinstalling the box: the new key

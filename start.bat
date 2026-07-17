@@ -1,5 +1,5 @@
 @echo off
-rem TBH Box - starts the box (and Docker Desktop, if needed) and opens the screen
+rem Nexo Box - starts the box (and Docker Desktop, if needed) and opens the screen
 setlocal
 cd /d "%~dp0"
 

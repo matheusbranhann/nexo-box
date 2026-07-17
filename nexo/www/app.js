@@ -192,25 +192,52 @@ $('#create-form').addEventListener('submit', async e => {
 
 $('#c-name').addEventListener('input', e => { e.target.value = e.target.value.toLowerCase().replace(/[^a-z0-9\-]/g, ''); });
 
-// ---------- transfer ----------
+// ---------- transfer (your PC <-> a box) ----------
 function fillTransferSelects() {
   const opts = instances.map(i => `<option value="${i.name}">${esc(i.name)}</option>`).join('');
-  const base = `<option value="base">base (template)</option>`;
-  $('#t-from').innerHTML = base + opts;
-  $('#t-to').innerHTML = base + opts;
-  if (instances[0]) $('#t-to').value = instances[0].name;
+  $('#t-box').innerHTML = `<option value="base">base (template)</option>` + opts;
+  loadBoxFiles();
 }
-$('#btn-transfer').addEventListener('click', async () => {
-  const from = $('#t-from').value, to = $('#t-to').value;
-  const st = $('#transfer-status');
-  if (from === to) { st.textContent = 'SOURCE AND DESTINATION ARE THE SAME'; return; }
-  st.textContent = 'TRANSFERRING…';
+async function loadBoxFiles() {
+  const box = $('#t-box').value;
+  const ul = $('#t-files');
   try {
-    const r = await api('/api/transfer', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from, to }) });
-    st.textContent = r.copied + ' FILE(S) COPIED · ' + from.toUpperCase() + ' → ' + to.toUpperCase();
-    logEvent('Transfer', from + ' → ' + to + ' (' + r.copied + ')', 'violet');
-    toast('Data transferred', r.copied + ' file(s)');
-  } catch (e) { st.textContent = ''; toast('Transfer failed', e.message, true); }
+    const files = await api('/api/files?instance=' + encodeURIComponent(box));
+    if (!files.length) { ul.innerHTML = '<li class="file-empty">No files in this box yet.</li>'; return; }
+    ul.innerHTML = files.map(f =>
+      `<li><span><strong>${esc(f.name)}</strong><small>${f.sizeKB} KB</small></span>` +
+      `<a class="row-action" title="Download to this PC" href="/api/download?instance=${encodeURIComponent(box)}&name=${encodeURIComponent(f.name)}"><svg><use href="#i-external"/></svg></a></li>`
+    ).join('');
+  } catch { ul.innerHTML = '<li class="file-empty">Could not list files.</li>'; }
+}
+$('#t-box').addEventListener('change', loadBoxFiles);
+$('#btn-upload').addEventListener('click', () => {
+  const box = $('#t-box').value;
+  const input = $('#t-file');
+  const file = input.files[0];
+  const st = $('#upload-status');
+  if (!file) { st.textContent = 'PICK A FILE FIRST'; return; }
+  const bar = $('#upload-bar'), fill = $('#upload-fill');
+  bar.hidden = false; fill.style.width = '0%';
+  st.textContent = 'UPLOADING ' + file.name.toUpperCase();
+  const xhr = new XMLHttpRequest();
+  xhr.open('POST', '/api/upload?instance=' + encodeURIComponent(box) + '&name=' + encodeURIComponent(file.name));
+  xhr.upload.onprogress = e => { if (e.lengthComputable) fill.style.width = Math.round(e.loaded / e.total * 100) + '%'; };
+  xhr.onload = () => {
+    bar.hidden = true;
+    if (xhr.status >= 200 && xhr.status < 300) {
+      st.textContent = 'UPLOADED · ' + file.name.toUpperCase() + ' -> ' + box.toUpperCase();
+      logEvent('File uploaded', file.name + ' -> ' + box, 'cyan');
+      toast('File sent to the box', file.name);
+      input.value = ''; loadBoxFiles();
+    } else {
+      let msg = 'HTTP ' + xhr.status;
+      try { msg = JSON.parse(xhr.responseText).error || msg; } catch {}
+      st.textContent = ''; toast('Upload failed', msg, true);
+    }
+  };
+  xhr.onerror = () => { bar.hidden = true; st.textContent = ''; toast('Upload failed', 'network error', true); };
+  xhr.send(file);
 });
 
 // ---------- modal ----------

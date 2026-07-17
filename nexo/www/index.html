@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="NexoGate — Windows instance orchestrator for Steam and AI.">
+  <meta name="description" content="NexoGate — Windows instance orchestrator for AI.">
   <meta name="theme-color" content="#07101f">
   <title>NexoGate — Instances</title>
   <link rel="icon" href="logo.png" type="image/png">
@@ -63,7 +63,7 @@
         <div>
           <p class="eyebrow"><span>01</span> OPERATIONAL VIEW</p>
           <h1>Your instances,<br>under <em>control.</em></h1>
-          <p class="intro-copy">Create, clone, and delete Windows instances from the base, monitor usage in real time, and transfer data between them.</p>
+          <p class="intro-copy">Create, clone, and delete Windows instances from the base, monitor usage in real time, and send files to them from your PC.</p>
         </div>
         <div class="intro-meta">
           <span>BASE / TEMPLATE</span>
@@ -122,7 +122,7 @@
         <aside class="quick-panel">
           <p class="eyebrow"><span>03</span> NEW INSTANCE</p>
           <h2>Clone from base</h2>
-          <p>A full copy of Windows already optimized with Steam and the game. Ready in minutes.</p>
+          <p>A full copy of the base Windows, already optimized. Ready in minutes.</p>
           <form id="create-form">
             <label class="field-label">NAME (a-z, 0-9, hyphen)</label>
             <div class="input-shell"><input id="c-name" placeholder="player-02" maxlength="24" required></div>
@@ -158,22 +158,24 @@
       <div class="page-intro">
         <div>
           <p class="eyebrow"><span>01</span> DATA</p>
-          <h1>Transfer<br>between <em>instances.</em></h1>
-          <p class="intro-copy">Copy files from one instance's shared folder to another. Useful for migrating saves, configs, or payloads between copies.</p>
+          <h1>Send files<br>to a <em>box.</em></h1>
+          <p class="intro-copy">Upload a file from this PC into a box's shared folder. It shows up as <code>\\host.lan\Data</code> — the "Shared" folder on the box's desktop. Download files back the same way. (Start the box to see them appear live.)</p>
         </div>
       </div>
       <div class="transfer-grid">
         <div class="transfer-col">
-          <label class="field-label">SOURCE</label>
-          <div class="input-shell"><select id="t-from"></select></div>
-          <p style="color:var(--faint);font:8px/1.5 var(--mono);letter-spacing:.08em">Copies the files from this instance's <code>shared</code> folder.</p>
+          <label class="field-label">BOX</label>
+          <div class="input-shell"><select id="t-box"></select></div>
+          <label class="field-label">FILE FROM YOUR PC</label>
+          <input type="file" id="t-file" class="file-input">
+          <button class="button primary full" id="btn-upload" style="margin-top:14px">Upload to box <svg><use href="#i-arrow"/></svg></button>
+          <div class="upload-bar" id="upload-bar" hidden><span id="upload-fill"></span></div>
+          <p class="form-message" id="upload-status"></p>
         </div>
         <div class="transfer-arrow"><svg><use href="#i-arrow"/></svg></div>
         <div class="transfer-col">
-          <label class="field-label">DESTINATION</label>
-          <div class="input-shell"><select id="t-to"></select></div>
-          <button class="button primary full" id="btn-transfer" style="margin-top:8px">Transfer data <svg><use href="#i-swap"/></svg></button>
-          <p class="form-message" id="transfer-status"></p>
+          <label class="field-label">FILES IN THE BOX</label>
+          <ul class="file-list" id="t-files"><li class="file-empty">Select a box to list its files.</li></ul>
         </div>
       </div>
     </section>
@@ -188,13 +190,13 @@
       </div>
       <div class="docs-body">
         <h2>Base and clones</h2>
-        <p>The original instance (the box already installed and optimized) is the <strong>template</strong>. Each new instance is a copy of its disk (<code>data.qcow2</code>) — it comes with Windows, Steam, and the game ready to go. Only the AI key and the ports change.</p>
+        <p>The original instance (the box already installed and optimized) is the <strong>template</strong>. Each new instance is a copy of its disk (<code>data.qcow2</code>) — it comes with Windows ready to go. Only the AI key and the ports change.</p>
         <h2>Ports per instance</h2>
         <p>Each instance gets its own ports on <code>127.0.0.1</code>: the screen (noVNC) on <code>810X</code>, RDP on <code>820X</code>, and the MCP (AI) server on <code>830X</code>. Open the screen with the monitor button in the table.</p>
         <h2>Usage</h2>
         <p>Live CPU and RAM come from <code>docker stats</code>; the disk is the real size of <code>data.qcow2</code> (thin). The header shows the host total.</p>
         <h2>Data transfer</h2>
-        <p>On the Transfer tab, copy files between the instances' <code>shared</code> folders — they appear as the <code>\\host.lan\Data</code> folder inside each Windows.</p>
+        <p>On the Transfer tab, upload files from your PC into a box's <code>shared</code> folder — they appear as the <code>\\host.lan\Data</code> folder (and the "Shared" shortcut on the desktop) inside that box's Windows. You can download files back to your PC the same way.</p>
         <div class="callout"><svg style="color:var(--cyan)"><use href="#i-shield"/></svg><span>Everything runs locally on your PC. No port is exposed to the network — only <code>127.0.0.1</code>.</span></div>
       </div>
     </section>
