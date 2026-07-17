@@ -138,28 +138,38 @@ Build-NexoConfigIso -OutIso $baseCfgIso -Key $key -AppId $appId -IncludeInstalle
 Write-Ok "Config CD built: $baseCfgIso"
 
 # ---------- 8. Unattended install ----------
-# If Windows is already installed (MCP answers on 8000) we skip straight to "running".
+# If Windows is already installed (MCP answers on 8000) we skip straight to done.
 $ports = Get-VmPorts -Slot 0
-if (Wait-Tcp -Port $ports.McpPort -TimeoutSec 3) {
+if (Wait-Mcp -Port $ports.McpPort -TimeoutSec 3) {
     Write-Ok 'Base already provisioned (MCP is answering) - nothing to install.'
 } else {
     Write-Step 'Installing Windows into the base (hands-off; 20-40 min)'
     $vmArgs = Get-VmArgs -Name 'nexo-base' -DiskPath $baseDisk -Ram $ram -Cores $cores -Slot 0 `
                          -InstallIso $iso.FullName -ConfigIso $baseCfgIso
-    $pidFile = Join-Path $storage 'base.pid'
-    $proc = Start-Vm -VmArgs $vmArgs -PidFile $pidFile
-    Write-Ok "QEMU started (pid $($proc.Id)). Watch the screen with a VNC viewer at 127.0.0.1:$($ports.VncPort)."
+    # Run under a relaunch loop: QEMU exits when Setup reboots (WinPE->installed);
+    # the loop relaunches it (booting the disk) so the install runs to completion.
+    $loopBat = Join-Path $storage 'base-install-loop.bat'
+    $errLog  = Join-Path $storage 'base-install.err'
+    Start-InstallLoop -VmArgs $vmArgs -LoopBat $loopBat -ErrLog $errLog
+    Write-Ok "Installer started. Watch the screen with a VNC viewer at 127.0.0.1:$($ports.VncPort)."
 
-    # tap Enter to get past the CD's "Press any key to boot from CD" prompt
+    # tap Enter past the CD's "Press any key to boot from CD" prompt (first boot only;
+    # later relaunches get no taps, so the CD times out and the installed disk boots)
     Write-Host '    Getting past the boot prompt...'
-    Push-BootPrompt -MonPort $ports.MonPort -Seconds 20
+    Push-BootPrompt -MonPort $ports.MonPort -Seconds 18
 
-    Write-Host '    Waiting for the guest to finish installing and start its MCP server...'
-    Write-Host '    (this is hands-off; leave it running)'
-    if (Wait-Tcp -Port $ports.McpPort -TimeoutSec 3000) {
-        Write-Ok 'Base is up: the guest MCP server is answering.'
+    Write-Host '    Waiting for Windows to install and provision (MCP)... (hands-off)'
+    $ok = Wait-Mcp -Port $ports.McpPort -TimeoutSec 3000
+
+    # stop the install loop; the base is a template (instances are clones of it)
+    Stop-InstallLoop -LoopBat $loopBat
+    $pr = Get-VmProcess -Name 'nexo-base'
+    if ($pr) { Stop-Vm -MonPort $ports.MonPort -ProcessId ([int]$pr.ProcessId) | Out-Null }
+
+    if ($ok) {
+        Write-Ok 'Base built: Windows installed, provisioned, and MCP answered. Base is now a stopped template.'
     } else {
-        Write-Warn "The MCP server did not answer within the time limit. The install may still be running - watch VNC 127.0.0.1:$($ports.VncPort). Re-run install.bat to resume waiting."
+        Write-Warn "MCP did not answer within the time limit. The install may still need time - watch VNC 127.0.0.1:$($ports.VncPort), or re-run install.bat to resume."
     }
 }
 

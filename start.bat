@@ -1,7 +1,16 @@
 @echo off
-rem Nexo Box - starts the box (and Docker Desktop, if needed) and opens the screen
+rem Nexo Box - starts the box and opens the screen.
+rem Windows 10 -> native QEMU engine; Windows 11 -> Docker engine.
+rem Safe for shell:startup (does nothing if the box is already running).
 setlocal
 cd /d "%~dp0"
+
+rem --- Windows 10: hand off to the QEMU engine and exit ---
+powershell -NoProfile -Command "if([int](Get-CimInstance Win32_OperatingSystem).BuildNumber -lt 22000){exit 1}else{exit 0}"
+if %errorlevel%==1 (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start-qemu.ps1"
+    goto :eof
+)
 
 if not exist ".env" (
     echo .env not found - run install.bat first.

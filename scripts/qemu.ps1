@@ -205,9 +205,16 @@ function Get-VmArgs {
     $hostfwd = "hostfwd=tcp:127.0.0.1:$($p.McpPort)-:8000,hostfwd=tcp:127.0.0.1:$($p.RdpPort)-:3389"
 
     $vmArgs = @(
-        '-accel','whpx,kernel-irqchip=off',
+        # NOTE: use WHPX's DEFAULT in-kernel irqchip. "kernel-irqchip=off" makes a
+        # Windows guest hang forever at the boot logo (stuck in HLT waiting for an
+        # interrupt the split/off irqchip never delivers). Verified on Ryzen Zen4/Zen5:
+        # default irqchip installs Windows fine; kernel-irqchip=off never boots it.
+        '-accel','whpx',
         '-machine','pc',
-        '-cpu','qemu64',
+        # qemu64 minus x2apic: with x2apic on, WHPX triple-faults (VP exit 4,
+        # "interrupt vector 0") when the INSTALLED Windows boots. -x2apic makes
+        # Windows use legacy xAPIC and boots cleanly. Verified on Ryzen Zen4/Zen5.
+        '-cpu','qemu64,-x2apic',
         '-smp',"$Cores",
         '-m',"$Ram",
         # boot disk on AHCI/SATA (in-box Windows driver; no virtio needed)
@@ -232,10 +239,22 @@ function Get-VmArgs {
         $vmArgs += @('-drive',"file=$ConfigIso,media=cdrom,index=$cdIndex,readonly=on"); $cdIndex++
     }
     if ($InstallIso) {
-        # boot the CD only on the first power-on; every later reboot goes to disk
-        $vmArgs += @('-boot','once=d,menu=off')
+        # order=dc: an EMPTY disk falls through to the CD (starts install); once
+        # Windows is installed, the CD's "press any key" times out (~5s) and the
+        # now-bootable disk boots. Paired with the install loop (Start-InstallLoop),
+        # this carries the guest through Setup's multiple reboots to completion.
+        $vmArgs += @('-boot','order=dc,menu=off')
     }
     return ,$vmArgs
+}
+
+# --- join an argument array into a command line, quoting args with spaces ---
+# Start-Process -ArgumentList (array) on Windows PowerShell 5.1 does NOT quote
+# elements containing spaces, which breaks "-drive file=C:\...\a b\x.qcow2,..."
+# when the path has a space (e.g. a user profile like "renan santtops").
+function ConvertTo-ArgString {
+    param([string[]]$Items)
+    ($Items | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
 }
 
 # --- start a VM detached; returns the process object ---
@@ -243,7 +262,8 @@ function Start-Vm {
     param([string[]]$VmArgs, [string]$PidFile = $null)
     $exe = Find-QemuExe
     if (-not $exe) { throw 'QEMU not found. Run install.bat (it installs QEMU on Windows 10).' }
-    $proc = Start-Process -FilePath $exe -ArgumentList $VmArgs -WindowStyle Minimized -PassThru
+    $argStr = ConvertTo-ArgString $VmArgs
+    $proc = Start-Process -FilePath $exe -ArgumentList $argStr -WindowStyle Minimized -PassThru
     if ($PidFile) { Set-Content -Path $PidFile -Value $proc.Id -Encoding ascii -NoNewline }
     return $proc
 }
@@ -330,4 +350,55 @@ function Wait-Tcp {
         Start-Sleep -Seconds 5
     }
     return $false
+}
+
+# --- wait until the guest's Windows-MCP server actually answers HTTP ---
+# (a raw TCP check is a FALSE POSITIVE with user-mode hostfwd: QEMU accepts the
+#  connection even when nothing listens in the guest. A real HTTP request returns
+#  a status - 401, since MCP needs the Bearer key - only once the guest MCP is up.)
+function Wait-Mcp {
+    param([int]$Port, [int]$TimeoutSec = 3000)
+    $deadline = (Get-Date).AddSeconds($TimeoutSec)
+    while ((Get-Date) -lt $deadline) {
+        try {
+            Invoke-WebRequest "http://127.0.0.1:$Port/mcp" -Method Post -Body '{}' -ContentType 'application/json' -TimeoutSec 6 -UseBasicParsing -ErrorAction Stop | Out-Null
+            return $true
+        } catch {
+            if ($_.Exception.Response) { return $true }   # got an HTTP status = MCP is up
+        }
+        Start-Sleep -Seconds 10
+    }
+    return $false
+}
+
+# --- run a VM under a relaunch loop (survives Windows Setup's reboots) ---
+# QEMU exits when the guest reboots/powers off at the WinPE->installed transition;
+# the loop relaunches it (booting the disk) so the unattended install completes.
+function Start-InstallLoop {
+    param([Parameter(Mandatory=$true)][string[]]$VmArgs,
+          [Parameter(Mandatory=$true)][string]$LoopBat,
+          [Parameter(Mandatory=$true)][string]$ErrLog)
+    $exe = Find-QemuExe
+    if (-not $exe) { throw 'QEMU not found. Run install.bat (it installs QEMU on Windows 10).' }
+    $argStr = ConvertTo-ArgString $VmArgs
+    Remove-Item $ErrLog -Force -ErrorAction SilentlyContinue
+    @(
+        '@echo off',
+        "cd /d ""$(Split-Path $exe)""",
+        ':loop',
+        """$exe"" $argStr 2>>""$ErrLog""",
+        'timeout /t 3 /nobreak >nul',
+        'goto loop'
+    ) | Set-Content -Path $LoopBat -Encoding ascii
+    Start-Process -FilePath $LoopBat -WindowStyle Minimized | Out-Null
+}
+
+# --- stop the install loop wrapper (so it stops relaunching QEMU) ---
+function Stop-InstallLoop {
+    param([Parameter(Mandatory=$true)][string]$LoopBat)
+    $leaf = Split-Path $LoopBat -Leaf
+    Get-CimInstance Win32_Process -Filter "name='cmd.exe'" -ErrorAction SilentlyContinue |
+        Where-Object { $_.CommandLine -and $_.CommandLine -match [regex]::Escape($leaf) } |
+        ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    Start-Sleep -Milliseconds 500
 }
