@@ -194,8 +194,18 @@ $('#c-name').addEventListener('input', e => { e.target.value = e.target.value.to
 
 // ---------- transfer (your PC <-> a box) ----------
 function fillTransferSelects() {
-  const opts = instances.map(i => `<option value="${i.name}">${esc(i.name)}</option>`).join('');
-  $('#t-box').innerHTML = `<option value="base">base (template)</option>` + opts;
+  const box = $('#t-box');
+  // only instances (clones) — never the base template
+  if (!instances.length) {
+    box.innerHTML = '<option value="">No instances yet</option>';
+    box.disabled = true;
+    $('#btn-upload').disabled = true;
+    $('#t-files').innerHTML = '<li class="file-empty">Create an instance first (Instances tab), then send files to it.</li>';
+    return;
+  }
+  box.disabled = false;
+  $('#btn-upload').disabled = false;
+  box.innerHTML = instances.map(i => `<option value="${i.name}">${esc(i.name)}</option>`).join('');
   loadBoxFiles();
 }
 async function loadBoxFiles() {
@@ -216,6 +226,7 @@ $('#btn-upload').addEventListener('click', () => {
   const input = $('#t-file');
   const file = input.files[0];
   const st = $('#upload-status');
+  if (!box) { st.textContent = 'CREATE AN INSTANCE FIRST'; return; }
   if (!file) { st.textContent = 'PICK A FILE FIRST'; return; }
   const bar = $('#upload-bar'), fill = $('#upload-fill');
   bar.hidden = false; fill.style.width = '0%';
