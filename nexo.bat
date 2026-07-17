@@ -14,6 +14,10 @@ if %errorlevel% neq 0 (
     exit /b
 )
 
+rem stop any previous NexoGate server so this one starts clean on port 7099
+rem (avoids stale HTTP.sys registrations / "connection refused" from a dead server)
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'powershell.exe' -and $_.CommandLine -like '*-File*' -and $_.CommandLine -like '*nexo\server.ps1*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }" >nul 2>&1
+
 rem open the browser on the chosen port as soon as the server writes the URL
 del "%~dp0nexo\active.url" >nul 2>&1
 start "" powershell -NoProfile -WindowStyle Hidden -Command "$u='%~dp0nexo\active.url'; for($i=0;$i -lt 40;$i++){ if(Test-Path $u){ Start-Process (Get-Content $u -Raw).Trim(); break }; Start-Sleep -Milliseconds 400 }"
