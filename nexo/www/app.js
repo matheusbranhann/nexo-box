@@ -106,7 +106,7 @@ function renderInstances() {
       const running = i.status === 'running';
       const prov = i.status === 'provisioning';
       const acts = [];
-      if (running) acts.push(`<button class="row-action" title="Open screen" data-open="${i.web}"><svg><use href="#i-external"/></svg></button>`);
+      if (running) acts.push(`<button class="row-action" title="Open (RDP)" data-open="${i.name}"><svg><use href="#i-external"/></svg></button>`);
       if (running) acts.push(`<button class="row-action" title="Copy AI access (MCP)" data-mcp="${i.name}"><svg><use href="#i-key"/></svg></button>`);
       if (!prov && !running) acts.push(`<button class="row-action" title="Start" data-act="start" data-name="${i.name}"><svg><use href="#i-play"/></svg></button>`);
       if (running) acts.push(`<button class="row-action" title="Stop" data-act="stop" data-name="${i.name}"><svg><use href="#i-power"/></svg></button>`);
@@ -117,7 +117,7 @@ function renderInstances() {
       return `<tr>
         <td><div class="cell-name"><span class="device-icon ${iconClass(i, idx)}"><svg><use href="#i-monitor"/></svg></span>
           <span><strong>${esc(i.label || i.name)}</strong><small>${esc(i.os || 'Windows')} · clone of ${esc(i.source)}</small></span></div></td>
-        <td><code>web ${i.web}</code><br><small style="color:var(--faint)">mcp ${i.mcp} · rdp ${i.rdp}</small></td>
+        <td><code>rdp ${i.rdp}</code><br><small style="color:var(--faint)">vnc ${i.web} · mcp ${i.mcp}</small></td>
         <td>${esc(i.cpuLive)}<br><small style="color:var(--faint)">${esc(i.cpu)} vCPU</small></td>
         <td>${esc(i.memLive)}<div class="meter"><span style="width:${ramPct}%"></span></div></td>
         <td>${i.diskGB} GB</td>
@@ -131,10 +131,14 @@ function renderInstances() {
 }
 
 function bindRowActions() {
-  $$('[data-open]').forEach(b => b.onclick = () => window.open('http://localhost:' + b.dataset.open, '_blank'));
+  $$('[data-open]').forEach(b => b.onclick = () => {
+    toast('Opening RDP', 'user Docker · password admin');
+    window.location.href = '/api/rdp?instance=' + encodeURIComponent(b.dataset.open);
+  });
   $$('[data-mcp]').forEach(b => b.onclick = () => {
     const i = instances.find(x => x.name === b.dataset.mcp);
-    const txt = `http://localhost:${i.mcp}/mcp  (Bearer ${i.mcpKey})`;
+    const host = (overview && overview.hostIp) || location.hostname || 'localhost';
+    const txt = `http://${host}:${i.mcp}/mcp  (Bearer ${i.mcpKey})`;
     navigator.clipboard.writeText(txt).then(() => toast('AI access copied', i.name)).catch(() => {});
   });
   $$('[data-act]').forEach(b => b.onclick = () => doAction(b.dataset.name, b.dataset.act));

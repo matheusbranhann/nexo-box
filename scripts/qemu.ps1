@@ -202,7 +202,9 @@ function Get-VmArgs {
         [string]$ConfigIso = $null
     )
     $p = Get-VmPorts -Slot $Slot
-    $hostfwd = "hostfwd=tcp:127.0.0.1:$($p.McpPort)-:8000,hostfwd=tcp:127.0.0.1:$($p.RdpPort)-:3389"
+    # bind the forwarded ports (MCP, RDP) to 0.0.0.0 so the box is reachable from
+    # other PCs on the LAN (not just the host). VNC is bound to 0.0.0.0 below too.
+    $hostfwd = "hostfwd=tcp:0.0.0.0:$($p.McpPort)-:8000,hostfwd=tcp:0.0.0.0:$($p.RdpPort)-:3389"
 
     $vmArgs = @(
         # NOTE: use WHPX's DEFAULT in-kernel irqchip. "kernel-irqchip=off" makes a
@@ -225,7 +227,7 @@ function Get-VmArgs {
         '-netdev',"user,id=n0,$hostfwd",
         '-device','e1000,netdev=n0',
         '-vga','std',
-        '-vnc',"127.0.0.1:$($p.VncDisplay)",
+        '-vnc',"0.0.0.0:$($p.VncDisplay)",
         '-rtc','base=localtime',
         '-monitor',"tcp:127.0.0.1:$($p.MonPort),server,nowait",
         '-name',$Name

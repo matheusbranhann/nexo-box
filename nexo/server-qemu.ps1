@@ -9,7 +9,7 @@
 # ============================================================
 param(
     [int]$Port = 7099,
-    [string]$BindHost = '127.0.0.1'
+    [string]$BindHost = '0.0.0.0'   # LAN-accessible dashboard (reach it from any PC on the network)
 )
 $ErrorActionPreference = 'Continue'
 $Nexo        = $PSScriptRoot
@@ -30,6 +30,19 @@ function Get-OnDiskGB($p) {
     $h = 0; $l = $Native::GetCompressedFileSizeW($p, [ref]$h)
     return [math]::Round(([uint64]$h * 4294967296 + $l) / 1GB, 2)
 }
+
+# this host's LAN IPv4 (so the UI can build addresses reachable from other PCs)
+function Get-HostIp {
+    try {
+        $ip = Get-NetIPAddress -AddressFamily IPv4 -ErrorAction Stop |
+            Where-Object { $_.IPAddress -notmatch '^(127\.|169\.254\.)' -and $_.PrefixOrigin -in 'Dhcp','Manual' } |
+            Sort-Object { $_.IPAddress -notmatch '^(192\.168\.|10\.|172\.)' } |
+            Select-Object -First 1
+        if ($ip) { return $ip.IPAddress }
+    } catch { }
+    return '127.0.0.1'
+}
+$HostIp = Get-HostIp
 
 # --- instance inventory ---
 function Read-Instances {
@@ -92,7 +105,7 @@ function Get-Overview {
         hostRamGB=[math]::Round($cs.TotalPhysicalMemory/1GB,1); hostRamFreeGB=$avail
         hostCpu=(Get-CimInstance Win32_Processor | Select-Object -First 1).Name.Trim()
         hostThreads=(Get-CimInstance Win32_Processor | Select-Object -First 1).NumberOfLogicalProcessors
-        dockerUp=$engineUp; engine='qemu'; baseReady=(Test-Path $BaseDisk)
+        dockerUp=$engineUp; engine='qemu'; baseReady=(Test-Path $BaseDisk); hostIp=$HostIp
     }
 }
 
@@ -166,17 +179,21 @@ function Invoke-Vm($name, $action) {
 $mime = @{ '.html'='text/html; charset=utf-8'; '.css'='text/css; charset=utf-8'; '.js'='application/javascript; charset=utf-8'; '.png'='image/png'; '.svg'='image/svg+xml; charset=utf-8'; '.ico'='image/x-icon'; '.json'='application/json; charset=utf-8' }
 
 $listener = $null; $activePort = 0
+# HttpListener needs "+" (all interfaces) rather than the literal 0.0.0.0; requires elevation
+$prefixHost = if ($BindHost -in '0.0.0.0', '+', '*') { '+' } else { $BindHost }
 foreach ($p in $Port..($Port + 15)) {
     try {
         $l = [System.Net.HttpListener]::new()
-        $l.Prefixes.Add("http://${BindHost}:$p/")
+        $l.Prefixes.Add("http://${prefixHost}:$p/")
         $l.Start(); $listener = $l; $activePort = $p; break
     } catch { try { $l.Close() } catch {} }
 }
 if (-not $listener) { throw "No free port between $Port and $($Port+15)." }
-$url = "http://${BindHost}:$activePort/"
+# advertise a LAN-reachable address (the host IP), not "+"
+$advertHost = if ($prefixHost -eq '+') { $HostIp } else { $BindHost }
+$url = "http://${advertHost}:$activePort/"
 Set-Content -Path (Join-Path $Nexo 'active.url') -Value $url -Encoding ascii -NoNewline
-Write-Host "NexoGate (QEMU engine) running at $url  (close the window to stop)" -ForegroundColor Cyan
+Write-Host "NexoGate (QEMU engine) running at $url  (reachable from other PCs on the LAN)" -ForegroundColor Cyan
 
 function Send-Json($ctx, $obj, $code = 200) {
     $json = ConvertTo-Json -InputObject $obj -Depth 6
@@ -221,6 +238,26 @@ while ($listener.IsListening) {
             try { Send-Json $ctx (New-Instance $body) } catch { Send-Json $ctx @{ error = "$_" } 400 }; continue
         }
         elseif ($path -eq '/api/files' -and $method -eq 'GET') { Send-Json $ctx (,@()); continue }
+        elseif ($path -eq '/api/rdp' -and $method -eq 'GET') {
+            $n = $req.QueryString['instance']
+            $meta = Join-Path $InstDir "$n\instance.json"
+            if ($n -and (Test-Path $meta)) {
+                $i = Get-Content $meta -Raw | ConvertFrom-Json
+                $rdp = @(
+                    "full address:s:$($HostIp):$($i.rdp)",
+                    'username:s:Docker',
+                    'prompt for credentials:i:0',
+                    'screen mode id:i:1', 'desktopwidth:i:1280', 'desktopheight:i:720',
+                    'authentication level:i:0', 'negotiate security layer:i:1', 'enablecredsspsupport:i:0'
+                ) -join "`r`n"
+                $bytes = [Text.Encoding]::ASCII.GetBytes($rdp)
+                $ctx.Response.ContentType = 'application/x-rdp'
+                $ctx.Response.AddHeader('Content-Disposition', "attachment; filename=""nexo-$n.rdp""")
+                $ctx.Response.OutputStream.Write($bytes, 0, $bytes.Length)
+                $ctx.Response.Close()
+            } else { $ctx.Response.StatusCode = 404; $ctx.Response.Close() }
+            continue
+        }
         elseif ($path -match '^/api/instances/([a-z0-9\-]+)/(start|stop|restart|delete)$' -and $method -eq 'POST') {
             $n = $Matches[1]; $a = $Matches[2]
             try { Invoke-Vm $n $a; Send-Json $ctx @{ ok=$true; action=$a } }
