@@ -259,13 +259,22 @@ function ConvertTo-ArgString {
     ($Items | ForEach-Object { if ($_ -match '\s') { '"' + $_ + '"' } else { $_ } }) -join ' '
 }
 
-# --- start a VM detached; returns the process object ---
+# --- start a VM under a relaunch loop; returns the wrapper process object ---
+# QEMU EXITS whenever the guest reboots or powers off (Windows does this on first
+# boot of a fresh clone, on updates, etc.). Launching qemu directly leaves it dead
+# after the first reboot. A loop wrapper (cmd) relaunches it, so the box stays up and
+# also survives being orphaned by a short-lived launcher. Stop-Vm kills the wrapper.
 function Start-Vm {
     param([string[]]$VmArgs, [string]$PidFile = $null)
     $exe = Find-QemuExe
     if (-not $exe) { throw 'QEMU not found. Run install.bat (it installs QEMU on Windows 10).' }
     $argStr = ConvertTo-ArgString $VmArgs
-    $proc = Start-Process -FilePath $exe -ArgumentList $argStr -WindowStyle Minimized -PassThru
+    $vmName = 'vm'
+    for ($k = 0; $k -lt ($VmArgs.Count - 1); $k++) { if ($VmArgs[$k] -eq '-name') { $vmName = $VmArgs[$k + 1]; break } }
+    $bat = Join-Path $env:TEMP "nexo-loop-$vmName.bat"
+    $err = Join-Path $env:TEMP "nexo-loop-$vmName.err"
+    @('@echo off', "cd /d ""$(Split-Path $exe)""", ':loop', """$exe"" $argStr 2>>""$err""", 'timeout /t 3 /nobreak >nul', 'goto loop') | Set-Content -Path $bat -Encoding ascii
+    $proc = Start-Process -FilePath $bat -WindowStyle Minimized -PassThru
     if ($PidFile) { Set-Content -Path $PidFile -Value $proc.Id -Encoding ascii -NoNewline }
     return $proc
 }
@@ -298,19 +307,28 @@ function Push-BootPrompt {
     }
 }
 
-# --- graceful stop (ACPI power button) with a hard-kill fallback ---
+# --- stop a VM: kill its relaunch loop first, then power down / kill QEMU ---
+# $VmName is the QEMU -name value (e.g. "nexo-player01"). MonPort optional for ACPI powerdown.
 function Stop-Vm {
-    param([int]$MonPort, [int]$ProcessId = 0, [int]$WaitSec = 90)
-    $sent = Send-VmMonitor -MonPort $MonPort -Command 'system_powerdown'
-    if ($sent -and $ProcessId -gt 0) {
+    param([string]$VmName, [int]$MonPort = 0, [int]$WaitSec = 60)
+    # 1. kill the relaunch loop so it does not bring QEMU back
+    if ($VmName) {
+        $leaf = "nexo-loop-$VmName.bat"
+        Get-CimInstance Win32_Process -Filter "name='cmd.exe'" -ErrorAction SilentlyContinue |
+            Where-Object { $_.CommandLine -match [regex]::Escape($leaf) } |
+            ForEach-Object { Stop-Process -Id $_.ProcessId -Force -ErrorAction SilentlyContinue }
+    }
+    # 2. graceful ACPI powerdown
+    if ($MonPort -gt 0) { Send-VmMonitor -MonPort $MonPort -Command 'system_powerdown' | Out-Null }
+    # 3. wait for the guest to power off, else force-kill the QEMU process
+    if ($VmName) {
         $deadline = (Get-Date).AddSeconds($WaitSec)
         while ((Get-Date) -lt $deadline) {
-            if (-not (Get-Process -Id $ProcessId -ErrorAction SilentlyContinue)) { return $true }
+            if (-not (Get-VmProcess -Name $VmName)) { return $true }
             Start-Sleep -Seconds 3
         }
-    }
-    if ($ProcessId -gt 0) {
-        Stop-Process -Id $ProcessId -Force -ErrorAction SilentlyContinue
+        $pr = Get-VmProcess -Name $VmName
+        if ($pr) { Stop-Process -Id ([int]$pr.ProcessId) -Force -ErrorAction SilentlyContinue }
     }
     return $true
 }

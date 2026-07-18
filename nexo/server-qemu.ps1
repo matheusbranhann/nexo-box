@@ -188,10 +188,7 @@ function Invoke-Vm($name, $action) {
         Start-Vm -VmArgs $vmArgs -PidFile $pidF | Out-Null
     }
     function Stop-One {
-        $procId = 0
-        $pr = Get-VmProcess -Name "nexo-$name"
-        if ($pr) { $procId = [int]$pr.ProcessId }
-        Stop-Vm -MonPort $ports.MonPort -ProcessId $procId | Out-Null
+        Stop-Vm -VmName "nexo-$name" -MonPort $ports.MonPort | Out-Null
     }
 
     switch ($action) {

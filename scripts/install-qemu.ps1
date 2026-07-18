@@ -163,8 +163,7 @@ if (Wait-Mcp -Port $ports.McpPort -TimeoutSec 3) {
 
     # stop the install loop; the base is a template (instances are clones of it)
     Stop-InstallLoop -LoopBat $loopBat
-    $pr = Get-VmProcess -Name 'nexo-base'
-    if ($pr) { Stop-Vm -MonPort $ports.MonPort -ProcessId ([int]$pr.ProcessId) | Out-Null }
+    Stop-Vm -VmName 'nexo-base' -MonPort $ports.MonPort | Out-Null
 
     if ($ok) {
         Write-Ok 'Base built: Windows installed, provisioned, and MCP answered. Base is now a stopped template.'
