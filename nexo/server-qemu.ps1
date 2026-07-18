@@ -141,12 +141,32 @@ function New-Instance($body) {
     }
     $meta | ConvertTo-Json | Set-Content (Join-Path $dir 'instance.json') -Encoding utf8
 
+    # Clone INLINE (instant qcow2 backing file). Done in the long-lived server process
+    # rather than a short-lived worker: a worker that exits right after launch leaves
+    # QEMU orphaned and it gets reaped. As a child of the always-running server, it lives.
     $srcDisk = if ($meta.source -eq 'base') { $BaseDisk } else { Join-Path $InstDir "$($meta.source)\disk.qcow2" }
-    # quote every path arg: Start-Process -ArgumentList (array) does NOT quote elements
-    # with spaces, so a profile path like "renan santtops" would truncate and the clone
-    # worker would silently never run. Pass one properly-quoted argument string instead.
-    $argStr = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -Name "{1}" -SourceDisk "{2}" -Root "{3}"' -f $CloneWorker, $name, $srcDisk, $Root
-    Start-Process powershell.exe -WindowStyle Hidden -ArgumentList $argStr
+    $srcVm   = if ($meta.source -and $meta.source -ne 'base') { "nexo-$($meta.source)" } else { 'nexo-base' }
+    try {
+        if (Test-VmRunning -Name $srcVm) { throw "Source '$($meta.source)' is running - stop it before cloning." }
+        if (-not (Test-Path $srcDisk)) { throw "Source disk not found: $srcDisk" }
+        $disk = Join-Path $dir 'disk.qcow2'
+        Remove-Item $disk -Force -ErrorAction SilentlyContinue
+        $img = Find-QemuImg
+        & $img create -f qcow2 -b $srcDisk -F qcow2 $disk 2>&1 | Out-Null
+        if (-not (Test-Path $disk)) { throw 'qemu-img backing clone failed.' }
+        $appId = ''
+        $envF = Join-Path $Root '.env'
+        if (Test-Path $envF) { $l = Get-Content $envF | Where-Object { $_ -match '^STEAM_APP_ID=' } | Select-Object -First 1; if ($l) { $appId = ($l -replace '^STEAM_APP_ID=', '').Trim() } }
+        $cfg = Join-Path $dir 'config.iso'
+        Build-NexoConfigIso -OutIso $cfg -Key $key -AppId $appId | Out-Null
+        $vmArgs = Get-VmArgs -Name "nexo-$name" -DiskPath $disk -Ram $meta.ram -Cores ([int]$meta.cpu) -Slot $slot -ConfigIso $cfg
+        Start-Vm -VmArgs $vmArgs -PidFile (Join-Path $dir 'vm.pid') | Out-Null
+        $meta.status = 'running'
+    } catch {
+        "clone error: $_" | Out-File (Join-Path $dir 'clone.log')
+        $meta.status = 'error'
+    }
+    $meta | ConvertTo-Json | Set-Content (Join-Path $dir 'instance.json') -Encoding utf8
     return $meta
 }
 
