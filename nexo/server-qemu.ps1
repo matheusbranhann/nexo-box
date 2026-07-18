@@ -113,7 +113,7 @@ function Get-Overview {
         hostRamGB=[math]::Round($cs.TotalPhysicalMemory/1GB,1); hostRamFreeGB=$avail
         hostCpu=(Get-CimInstance Win32_Processor | Select-Object -First 1).Name.Trim()
         hostThreads=(Get-CimInstance Win32_Processor | Select-Object -First 1).NumberOfLogicalProcessors
-        dockerUp=$engineUp; engine='qemu'; baseReady=(Test-Path $BaseDisk); hostIp=$HostIp
+        dockerUp=$engineUp; engine='qemu'; baseReady=($baseDisk -gt 0); hostIp=$HostIp
     }
 }
 
