@@ -85,10 +85,18 @@ function Get-InstancesPayload {
 }
 
 function Get-Overview {
-    $insts = @(Get-InstancesPayload)
-    $running = @($insts | Where-Object { $_.status -eq 'running' }).Count
-    $prov    = @($insts | Where-Object { $_.status -eq 'provisioning' }).Count
-    $diskSum = 0; foreach ($x in $insts) { $diskSum += [double]$x.diskGB }
+    # compute from the raw inventory (NOT @(Get-InstancesPayload) - the comma-wrapped
+    # return collapses to Count 1 for an empty list, giving a phantom "1 instance")
+    $rows = @()
+    foreach ($i in (Read-Instances)) {
+        $run = Test-VmRunning -Name "nexo-$($i.name)"
+        $st = if ($i.status -eq 'provisioning') { 'provisioning' } elseif ($run) { 'running' } else { 'stopped' }
+        $rows += [pscustomobject]@{ status = $st; diskGB = (Get-OnDiskGB (Join-Path $InstDir "$($i.name)\disk.qcow2")) }
+    }
+    $rows = @($rows)
+    $running = @($rows | Where-Object { $_.status -eq 'running' }).Count
+    $prov    = @($rows | Where-Object { $_.status -eq 'provisioning' }).Count
+    $diskSum = 0.0; foreach ($x in $rows) { $diskSum += [double]$x.diskGB }
     $baseDisk = Get-OnDiskGB $BaseDisk
     $cs = Get-CimInstance Win32_ComputerSystem
     $avail = 0
@@ -100,7 +108,7 @@ function Get-Overview {
         $engineUp = (($whp -and $whp.State -eq 'Enabled') -and [bool](Find-QemuExe))
     } catch {}
     return [pscustomobject]@{
-        total=@($insts).Count; running=$running; provisioning=$prov
+        total=$rows.Count; running=$running; provisioning=$prov
         diskSumGB=[math]::Round(($diskSum + $baseDisk), 2); baseDiskGB=$baseDisk
         hostRamGB=[math]::Round($cs.TotalPhysicalMemory/1GB,1); hostRamFreeGB=$avail
         hostCpu=(Get-CimInstance Win32_Processor | Select-Object -First 1).Name.Trim()
@@ -134,10 +142,11 @@ function New-Instance($body) {
     $meta | ConvertTo-Json | Set-Content (Join-Path $dir 'instance.json') -Encoding utf8
 
     $srcDisk = if ($meta.source -eq 'base') { $BaseDisk } else { Join-Path $InstDir "$($meta.source)\disk.qcow2" }
-    Start-Process powershell.exe -WindowStyle Hidden -ArgumentList @(
-        '-NoProfile','-ExecutionPolicy','Bypass','-File',$CloneWorker,
-        '-Name',$name,'-SourceDisk',$srcDisk,'-Root',$Root
-    )
+    # quote every path arg: Start-Process -ArgumentList (array) does NOT quote elements
+    # with spaces, so a profile path like "renan santtops" would truncate and the clone
+    # worker would silently never run. Pass one properly-quoted argument string instead.
+    $argStr = '-NoProfile -ExecutionPolicy Bypass -File "{0}" -Name "{1}" -SourceDisk "{2}" -Root "{3}"' -f $CloneWorker, $name, $srcDisk, $Root
+    Start-Process powershell.exe -WindowStyle Hidden -ArgumentList $argStr
     return $meta
 }
 
